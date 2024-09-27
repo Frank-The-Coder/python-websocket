@@ -1,6 +1,0 @@
-{
-  "http": "http",
-  "socketport": "5000",
-  "certpath": "C:/Users/Owner/Desktop/Frank Uni/My Lingdang Job/Frank/Frank\u65b0/\u9a7b\u7559\u7a0b\u5e8f/pythonProject/final/ssl/cert.pem",
-  "keypath": "C:/Users/Owner/Desktop/Frank Uni/My Lingdang Job/Frank/Frank\u65b0/\u9a7b\u7559\u7a0b\u5e8f/pythonProject/final/ssl/key.pem"
-}
