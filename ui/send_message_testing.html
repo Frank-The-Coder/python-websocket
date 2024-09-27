@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SSE Client</title>
+    <style>
+        #messages {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-bottom: 1px solid #ddd;
+        }
+    </style>
+    <script src="../include/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Messages from Server</h1>
+    <div id="messages"></div>
+    <button id="sendMessageButton">Send Message</button>
+
+    <script type="text/javascript">
+        document.addEventListener("DOMContentLoaded", function () {
+            var socket = io("http://" + window.location.hostname + ":5000", {
+                transports: ['websocket']
+            });
+
+            socket.on('connect', function() {
+                console.log('Connected to server');
+            });
+
+            socket.on('message', function(data) {
+                console.log('Got Message!!!');
+                var messagesDiv = document.getElementById("messages");
+                var newMessage = document.createElement("div");
+                newMessage.className = "message";
+                newMessage.textContent = "New message: " + data.data;
+                messagesDiv.appendChild(newMessage);
+            });
+
+            socket.on('disconnect', function() {
+                console.log('Disconnected from server');
+            });
+
+            document.getElementById("sendMessageButton").addEventListener("click", function () {
+                var message = "Hello, userB!";
+                fetch("http://" + window.location.hostname + ":5000/notify", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ message: message })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data.status);
+                })
+                .catch(error => {
+                    console.error("Error sending message:", error);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

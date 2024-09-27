@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SSE Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #messages {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .alert-popup {
+            position: fixed;
+            bottom: 20px;
+            right: -350px; /* Start position off-screen */
+            width: 300px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, right 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 1000;
+        }
+
+        .alert-popup.visible {
+            opacity: 1;
+            right: 10px; /* Final position */
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 20px;
+            cursor: pointer;
+        }
+    </style>
+    <script src="socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Messages from Server</h1>
+    <div id="messages"></div>
+
+    <div id="alert-popup" class="alert-popup">
+        <div class="alert-content">
+            <span class="close-btn" id="close-btn">&times;</span>
+            <h2>消息提醒</h2>
+            <p><strong>发送人:</strong> <span id="sender"></span></p>
+            <p><strong>消息内容:</strong> <span id="message-content"></span></p>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        const alertQueue = JSON.parse(localStorage.getItem('alertQueue')) || [];
+        let isAlertVisible = false;
+        let originalTitle = document.title;
+        let titleInterval;
+
+        document.addEventListener("DOMContentLoaded", function () {
+            var socket = io("https://localhost:5000", {
+                transports: ['websocket'],
+                secure: true,
+                reconnectionAttempts: 5,
+                timeout: 20000
+            });
+
+            socket.on('connect', function() {
+                console.log('Connected to server');
+                processQueue();
+            });
+
+            socket.on('message', function(data) {
+                console.log('Got Message!!!');
+                var messagesDiv = document.getElementById("messages");
+                var newMessage = document.createElement("div");
+                newMessage.className = "message";
+                newMessage.textContent = "New message: " + data.data;
+                messagesDiv.appendChild(newMessage);
+
+                // 添加消息到队列
+                addAlertToQueue(data.sender, data.data);
+                processQueue();
+
+                // 任务栏和标签栏闪烁
+                startTitleBlink("New message received!");
+                showNotification("消息提醒", `${data.sender}: ${data.data}`);
+            });
+
+            socket.on('disconnect', function() {
+                console.log('Disconnected from server');
+            });
+
+            document.getElementById('close-btn').addEventListener('click', function() {
+                closeAlert();
+            });
+
+            window.addEventListener('beforeunload', function () {
+                localStorage.setItem('alertQueue', JSON.stringify(alertQueue));
+            });
+
+            processQueue(); // 页面加载时处理队列中的消息
+        });
+
+        function addAlertToQueue(sender, message) {
+            alertQueue.push({ sender, message });
+            localStorage.setItem('alertQueue', JSON.stringify(alertQueue));
+        }
+
+        function processQueue() {
+            if (!isAlertVisible && alertQueue.length > 0) {
+                const alert = alertQueue.shift();
+                localStorage.setItem('alertQueue', JSON.stringify(alertQueue));
+                showAlert(alert.sender, alert.message);
+            }
+        }
+
+        function showAlert(sender, message) {
+            isAlertVisible = true;
+            const alertPopup = document.getElementById('alert-popup');
+            document.getElementById('sender').textContent = sender;
+            document.getElementById('message-content').textContent = message;
+            alertPopup.classList.add('visible');
+        }
+
+        function closeAlert() {
+            const alertPopup = document.getElementById('alert-popup');
+            alertPopup.classList.remove('visible');
+            setTimeout(() => {
+                isAlertVisible = false;
+                processQueue();
+            }, 500); // 动画持续时间应与CSS中的transition一致
+        }
+
+        function startTitleBlink(message) {
+            if (!document.hasFocus()) {
+                titleInterval = setInterval(() => {
+                    document.title = document.title === originalTitle ? message : originalTitle;
+                }, 1000);
+            }
+        }
+
+        function stopTitleBlink() {
+            clearInterval(titleInterval);
+            document.title = originalTitle;
+        }
+
+        window.onfocus = stopTitleBlink;
+
+        function showNotification(title, message) {
+            if (Notification.permission === "granted") {
+                new Notification(title, { body: message });
+            } else if (Notification.permission !== "denied") {
+                Notification.requestPermission().then(permission => {
+                    if (permission === "granted") {
+                        new Notification(title, { body: message });
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>

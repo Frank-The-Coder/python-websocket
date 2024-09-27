@@ -1,0 +1,6 @@
+{
+  "http": "http",
+  "socketport": "5000",
+  "certpath": "",
+  "keypath": ""
+}

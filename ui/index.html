@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>SSE Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #messages {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .alert-popup {
+            position: fixed;
+            bottom: 20px;
+            right: -350px;
+            /* Start position off-screen */
+            width: 300px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, right 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 1000;
+        }
+
+        .alert-popup.visible {
+            opacity: 1;
+            right: 10px;
+            /* Final position */
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 1;
+        }
+
+        .progress-ring {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            top: 21px;
+            right: -23px;
+            transform: translate(-50%, -50%);
+        }
+
+        .progress-ring__circle {
+            stroke: blue;
+            stroke-width: 4;
+            fill: transparent;
+            r: 18;
+            cx: 20;
+            cy: 20;
+            transition: stroke-dashoffset 0.3s;
+        }
+
+        .tooltip {
+            position: absolute;
+            background-color: #333;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1001;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+        }
+
+        .tooltip::after {
+            content: "";
+            position: absolute;
+            top: 112%;
+            right: 12px;
+            transform: translateY(-50%);
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+</head>
+
+<body>
+    <h1>Messages from Server</h1>
+    <div id="messages"></div>
+
+    <div id="alert-popup" class="alert-popup">
+        <div class="alert-content">
+            <div id="progress-ring" class="progress-ring" style="display: none;">
+                <svg class="progress-ring__svg" width="40" height="40">
+                    <circle class="progress-ring__circle" stroke="blue" stroke-width="4" fill="transparent" r="18"
+                        cx="20" cy="20" />
+                </svg>
+            </div>
+            <span class="close-btn" id="close-btn" onmousedown="down(this)" onmouseup="up()" onclick="cli()"
+                onmouseleave="up()" onmouseenter="showTooltip()">&times;</span>
+            <h2>消息提醒</h2>
+            <p><strong>发送人:</strong> <span id="sender"></span></p>
+            <p><strong>消息内容:</strong> <span id="message-content"></span></p>
+        </div>
+    </div>
+
+    <div id="tooltip" class="tooltip">长按右上角的关闭按钮可以清空消息队列</div>
+
+    <script type="text/javascript">
+        const alertQueue = JSON.parse(localStorage.getItem('alertQueue')) || [];
+        let isAlertVisible = false;
+        let originalTitle = document.title;
+        let titleInterval;
+        let holdTimeout;
+        let progressInterval;
+        const holdDuration = 2000; // 2 seconds
+
+        document.addEventListener("DOMContentLoaded", function () {
+            // for(let i = 0; i<2; i++){
+            var serverIp = window.location.hostname; // 获取当前访问的服务器 IP 地址
+            var protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            console.log(serverIp);
+            var socket = io("http:" + "//" + serverIp + ":5000", {
+                transports: ['websocket']
+            });
+
+            socket.on('connect', function () {
+                console.log('Connected to server');
+                processQueue();
+            });
+
+            socket.on('message', function (data) {
+                console.log('Got Message!!!');
+                var messagesDiv = document.getElementById("messages");
+                var newMessage = document.createElement("div");
+                newMessage.className = "message";
+                newMessage.textContent = "New message: " + data.data;
+                messagesDiv.appendChild(newMessage);
+
+                // 添加消息到队列
+                addAlertToQueue(data.sender, data.data);
+                processQueue();
+
+                // 任务栏和标签栏闪烁
+                startTitleBlink("New message received!");
+                showNotification("消息提醒", `${data.sender}: ${data.data}`);
+            });
+
+            socket.on('error', function (data) {
+                console.error('Error from server:', data.data);
+                alert('Error: ' + data.data); // 显示错误信息给用户
+            });
+
+            socket.on('disconnect', function () {
+                console.log('Disconnected from server');
+            });
+
+            window.addEventListener('beforeunload', function () {
+                localStorage.setItem('alertQueue', JSON.stringify(alertQueue));
+            });
+
+            processQueue(); // 页面加载时处理队列中的消息
+            // }
+        });
+
+        function addAlertToQueue(sender, message) {
+            alertQueue.push({ sender, message });
+            localStorage.setItem('alertQueue', JSON.stringify(alertQueue));
+        }
+
+        function processQueue() {
+            if (!isAlertVisible && alertQueue.length > 0) {
+                const alert = alertQueue.shift();
+                localStorage.setItem('alertQueue', JSON.stringify(alertQueue));
+                showAlert(alert.sender, alert.message);
+            }
+        }
+
+        function showAlert(sender, message) {
+            isAlertVisible = true;
+            const alertPopup = document.getElementById('alert-popup');
+            document.getElementById('sender').textContent = sender;
+            document.getElementById('message-content').textContent = message;
+            alertPopup.classList.add('visible');
+        }
+
+        function closeAlert() {
+            const alertPopup = document.getElementById('alert-popup');
+            alertPopup.classList.remove('visible');
+            setTimeout(() => {
+                isAlertVisible = false;
+                processQueue();
+            }, 500); // 动画持续时间应与CSS中的transition一致
+        }
+
+        function startTitleBlink(message) {
+            if (!document.hasFocus()) {
+                titleInterval = setInterval(() => {
+                    document.title = document.title === originalTitle ? message : originalTitle;
+                }, 1000);
+            }
+        }
+
+        function stopTitleBlink() {
+            clearInterval(titleInterval);
+            document.title = originalTitle;
+        }
+
+        window.onfocus = stopTitleBlink;
+
+        function showNotification(title, message) {
+            if (Notification.permission === "granted") {
+                new Notification(title, { body: message });
+            } else if (Notification.permission !== "denied") {
+                Notification.requestPermission().then(permission => {
+                    if (permission === "granted") {
+                        new Notification(title, { body: message });
+                    }
+                });
+            }
+        }
+
+        const closeBtn = document.getElementById('close-btn');
+        let lock = false;
+        function down(event) {
+            holdTimeout = setTimeout(() => {
+                lock = false;
+                clearQueue();
+            }, holdDuration);
+            startProgressRing();
+            closeBtn.style.cursor = 'pointer'; // 确保鼠标指针样式
+        }
+        function up() {
+            clearTimeout(holdTimeout);
+            stopProgressRing();
+            setTimeout(() => {
+                lock = true;
+            });
+
+            const tooltip = document.getElementById('tooltip');
+            if (tooltip.classList.contains('visible')) {
+                tooltip.classList.remove('visible');
+            }
+        }
+        function cli() {
+            if (lock) {
+                closeAlert();
+            }
+        }
+
+        function clearQueue() {
+            // 清空消息队列
+            alertQueue.length = 0;
+            localStorage.setItem('alertQueue', JSON.stringify(alertQueue));
+            closeAlert();
+            stopProgressRing();
+        }
+
+        function startProgressRing() {
+            const progressRing = document.getElementById('progress-ring');
+            progressRing.style.display = 'block';
+
+            const circle = document.querySelector('.progress-ring__circle');
+            const radius = circle.r.baseVal.value;
+            const circumference = 2 * Math.PI * radius;
+            circle.style.strokeDasharray = circumference + ' ' + circumference;
+            circle.style.strokeDashoffset = circumference;
+
+            let progress = 0;
+            progressInterval = setInterval(() => {
+                progress += 120 / (holdDuration / 100);
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                }
+                const offset = circumference - (progress / 100) * circumference;
+                circle.style.strokeDashoffset = offset;
+            }, 100);
+        }
+
+        function stopProgressRing() {
+            clearInterval(progressInterval);
+            const progressRing = document.getElementById('progress-ring');
+            progressRing.style.display = 'none';
+        }
+
+        function showTooltip() {
+            const closeBtn = document.getElementById('close-btn');
+            const tooltip = document.getElementById('tooltip');
+            const closeBtnRect = closeBtn.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            tooltip.style.top = (closeBtnRect.top - closeBtnRect.height / 2 - tooltipRect.height) + 'px';
+            tooltip.style.left = (closeBtnRect.left + 2 * closeBtnRect.width - tooltipRect.width) + 'px';
+            console.log(closeBtnRect.width);
+            tooltip.classList.add('visible');
+            // setTimeout(() => {
+            //     tooltip.classList.remove('visible');
+            // }, 5000); // 5秒后隐藏工具提示
+        }
+    </script>
+</body>
+
+</html>
