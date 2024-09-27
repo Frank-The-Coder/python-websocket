@@ -3,4 +3,4 @@ __pycache__/
 final/
 folder1/
 venv/
-*/__pycache__/
+**/__pycache__/
