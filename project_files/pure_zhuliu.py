@@ -71,11 +71,11 @@ def handle_connect():
     connected_clients.append(request.sid)
 
     if connections[client_ip] > MAX_CONNECTIONS_PER_IP:
-        print(f"客户端连接: {request.sid} 客户端IP: {client_ip} (总数: {connections[client_ip]})")
-        socketio.emit('error', {'data': '此IP建立过多连接！'})
+        print(f"Client connected: {request.sid} Client IP: {client_ip} (Total: {connections[client_ip]})")
+        socketio.emit('error', {'data': 'Too many connections from this IP!'})
         disconnect(request.sid)
     else:
-        print(f"客户端连接: {request.sid} 客户端IP: {client_ip} (总数: {connections[client_ip]})")
+        print(f"Client connected: {request.sid} Client IP: {client_ip} (Total: {connections[client_ip]})")
 
 
 @socketio.on('disconnect')
@@ -86,7 +86,7 @@ def handle_disconnect():
         if connections[client_ip] <= 0:
             del connections[client_ip]
 
-    print(f"客户端断开: {request.sid}  客户端IP: {client_ip} (剩余: {connections.get(client_ip, 0)})")
+    print(f"Client disconnected: {request.sid} Client IP: {client_ip} (Remaining: {connections.get(client_ip, 0)})")
     connected_clients.remove(request.sid)
 
 
@@ -96,7 +96,7 @@ def run_flask_app():
     if http == 'https':
         if os.path.exists(certfile) and os.path.exists(keyfile):
             socketio.run(app, host='0.0.0.0', port=int(socketport), certfile=certfile, keyfile=keyfile)
-        print("客户正在使用https!!!")
+        print("The client is using HTTPS! Requires permission files!")
     else:
         socketio.run(app, host='0.0.0.0', port=int(socketport))
 

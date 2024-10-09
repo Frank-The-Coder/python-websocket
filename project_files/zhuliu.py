@@ -15,7 +15,7 @@ from PyQt5.QtCore import Qt
 from qt_ui import pyqt_ui2
 import json
 
-# Flask部分
+# Flask section
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -24,13 +24,15 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 API_KEY = '' 
 connected_clients = []
 
-# 用于记录每个IP地址的连接数
+# To record each IP's total number of connections
 connections = {}
 MAX_CONNECTIONS_PER_IP = 2000
 CONFIG_FILE = "socket_config.json"
 socketrun = False
 
 ICON_PATH = "../img/favicon.ico"
+TITLE = "Websocket Service Console"
+
 
 
 def load_config():
@@ -80,11 +82,11 @@ def handle_connect():
     connected_clients.append(request.sid)
 
     if connections[client_ip] > MAX_CONNECTIONS_PER_IP:
-        print(f"客户端连接: {request.sid} 客户端IP: {client_ip} (总数: {connections[client_ip]})")
-        socketio.emit('error', {'data': '此IP建立过多连接！'})
+        print(f"Client connected: {request.sid} Client IP: {client_ip} (Total: {connections[client_ip]})")
+        socketio.emit('error', {'data': 'Too many connections from this IP!'})
         disconnect(request.sid)
     else:
-        print(f"客户端连接: {request.sid} 客户端IP: {client_ip} (总数: {connections[client_ip]})")
+        print(f"Client connected: {request.sid} Client IP: {client_ip} (Total: {connections[client_ip]})")
 
 
 @socketio.on('disconnect')
@@ -95,7 +97,7 @@ def handle_disconnect():
         if connections[client_ip] <= 0:
             del connections[client_ip]
 
-    print(f"客户端断开: {request.sid}  客户端IP: {client_ip} (剩余: {connections.get(client_ip, 0)})")
+    print(f"Client disconnected: {request.sid} Client IP: {client_ip} (Remaining: {connections.get(client_ip, 0)})")
     connected_clients.remove(request.sid)
 
 
@@ -105,12 +107,12 @@ def run_flask_app():
     if http == 'https':
         if os.path.exists(certfile) and os.path.exists(keyfile):
             socketio.run(app, host='0.0.0.0', port=int(socketport), certfile=certfile, keyfile=keyfile)
-        print("客户正在使用https!!!")
+        print("The client is using HTTPS! Requires permission files!")
     else:
         socketio.run(app, host='0.0.0.0', port=int(socketport))
 
 
-# PyQt部分
+# PyQt Section
 class MainWindowNew(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -118,7 +120,7 @@ class MainWindowNew(QMainWindow):
         _translate = QtCore.QCoreApplication.translate
         self.setWindowIcon(QIcon(ICON_PATH))
         ui.setupUi(self)
-        self.setWindowTitle(_translate("MainWindow", "灵当CRM服务控制台"))
+        self.setWindowTitle(_translate("MainWindow", TITLE))
         ui.pushButton_9.clicked.connect(self.import_certificate)
         ui.pushButton_10.clicked.connect(self.import_key)
         ui.lineEdit_13.setText(_translate("MainWindow", socketport))
@@ -129,7 +131,7 @@ class MainWindowNew(QMainWindow):
         ui.pushButton_11.clicked.connect(self.ask_http)
 
     def import_certificate(self):
-        # 打开文件对话框
+        # Open file dialog
         global certfile
         certfile, _ = QFileDialog.getOpenFileName(self, 'Open File', '', 'All Files (*)')
         if certfile:
@@ -138,7 +140,7 @@ class MainWindowNew(QMainWindow):
             print(f'File imported: {certfile}')
 
     def import_key(self):
-        # 打开文件对话框
+        # Open File Dialogue
         global keyfile
         keyfile, _ = QFileDialog.getOpenFileName(self, 'Open File', '', 'All Files (*)')
         if keyfile:
@@ -149,8 +151,8 @@ class MainWindowNew(QMainWindow):
     def ask_http(self):
         global http
         msg_box = QMessageBox(self)
-        msg_box.setWindowTitle('网络协议')
-        msg_box.setText("您使用的网络协议是？")
+        msg_box.setWindowTitle('Network protocol')
+        msg_box.setText("What network protocol are you using?")
         http_button = msg_box.addButton("HTTP", QMessageBox.NoRole)
         https_button = msg_box.addButton("HTTPS", QMessageBox.YesRole)
 
@@ -158,10 +160,10 @@ class MainWindowNew(QMainWindow):
 
         if msg_box.clickedButton() == http_button:
             http = "http"
-            self.show_success_message("Changed successfully，restart the program to apply changes!")
+            self.show_success_message("Changed successfully, restart the program to apply changes!")
         elif msg_box.clickedButton() == https_button:
             http = "https"
-            self.show_success_message("Changed successfully，restart the program to apply changes!")
+            self.show_success_message("Changed successfully, restart the program to apply changes!")
         elif result == QMessageBox.Rejected:  # The "X" button
             http = config["http"]
 
@@ -169,14 +171,14 @@ class MainWindowNew(QMainWindow):
         save_config(config)
 
     def save_socketport(self, ui):
-        # 打开文件对话框
+        # Open file dialogue
         global socketport, socketio
         socketport = ui.lineEdit_13.text()
         config["socketport"] = socketport
         save_config(config)
 
-        # 显示自定义成功提示框
-        self.show_success_message("Saved successfully，restart the program to apply changes!")
+        # display sucessful customization message
+        self.show_success_message("Saved successfully, restart the program to apply changes!")
 
     def show_success_message(self, message):
         self.msg_label = QtWidgets.QLabel(message, self)
@@ -191,21 +193,21 @@ class MainWindowNew(QMainWindow):
         """)
         self.msg_label.setAlignment(QtCore.Qt.AlignCenter)
         self.msg_label.setFixedSize(200, 50)
-        # 计算窗口中心位置
+        # calculate centre poin
         center_x = (self.width() - self.msg_label.width()) // 2
         center_y = (self.height() - self.msg_label.height()) // 2
         self.msg_label.move(center_x, center_y)
         self.msg_label.show()
 
-        # 使用计时器关闭提示框
-        QtCore.QTimer.singleShot(3000, self.msg_label.close)  # 提示框显示 1 秒后关闭
+        # use timer to close success message
+        QtCore.QTimer.singleShot(3000, self.msg_label.close)  # closes in 3 seconds
 
     def closeEvent(self, event):
         msg_box = QMessageBox(self)
-        msg_box.setWindowTitle('提醒')
-        msg_box.setText("是否隐藏到托盘？")
-        yes_button = msg_box.addButton("是", QMessageBox.NoRole)
-        no_button = msg_box.addButton("否", QMessageBox.YesRole)
+        msg_box.setWindowTitle('Reminder')
+        msg_box.setText("Minimize to tray?")
+        yes_button = msg_box.addButton("Yes", QMessageBox.NoRole)
+        no_button = msg_box.addButton("N", QMessageBox.YesRole)
 
         result = msg_box.exec_()
 
@@ -236,7 +238,7 @@ class SystemTray(QSystemTrayIcon):
         self.new_window = MainWindowNew()  # Only one instance
 
         self.menu = QMenu()
-        quit_action = QAction("退出程序", self.parent())
+        quit_action = QAction("Quit application", self.parent())
         quit_action.triggered.connect(self.quit_app)
         self.menu.addAction(quit_action)
 
@@ -268,7 +270,7 @@ if __name__ == '__main__':
     win = MainWindowNew()  # Use the new main window directly
     tray = SystemTray(win)  # Pass the new window as parent to the tray
 
-    # 启动Flask服务器线程
+    # Start Flask server thread
     flask_thread = threading.Thread(target=run_flask_app, daemon=True)
     flask_thread.start()
 

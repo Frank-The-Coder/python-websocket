@@ -14,6 +14,7 @@ from qt_ui import pyqt_ui2
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 ICON_PATH = "../img/favicon.ico"
+TITLE = "Websocket Service Console"
 
 
 class MainWindowNew(QMainWindow):
@@ -23,14 +24,14 @@ class MainWindowNew(QMainWindow):
         _translate = QtCore.QCoreApplication.translate
         self.setWindowIcon(QIcon(ICON_PATH))
         ui.setupUi(self)
-        self.setWindowTitle(_translate("MainWindow", "灵当CRM服务控制台"))
+        self.setWindowTitle(_translate("MainWindow", TITLE))
 
     def closeEvent(self, event):
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle('Message')
-        msg_box.setText("是否隐藏到托盘？")
-        yes_button = msg_box.addButton("是", QMessageBox.NoRole)
-        no_button = msg_box.addButton("否", QMessageBox.YesRole)
+        msg_box.setText("Minimize to tray？")
+        yes_button = msg_box.addButton("Yes", QMessageBox.NoRole)
+        no_button = msg_box.addButton("No", QMessageBox.YesRole)
 
         result = msg_box.exec_()
 
@@ -61,7 +62,7 @@ class SystemTray(QSystemTrayIcon):
         self.new_window = MainWindowNew()  # Only one instance
 
         self.menu = QMenu()
-        quit_action = QAction("退出程序", self.parent())
+        quit_action = QAction("Quit application", self.parent())
         quit_action.triggered.connect(self.quit_app)
         self.menu.addAction(quit_action)
 
